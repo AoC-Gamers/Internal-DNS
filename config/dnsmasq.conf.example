@@ -1,0 +1,27 @@
+# DNS interno para clientes VPN (EJEMPLO GENERICO)
+# Copia este archivo a config/dnsmasq.conf y ajusta IPs/hosts según tu entorno.
+
+# Escucha solo en loopback y túnel VPN
+listen-address=127.0.0.1,10.8.0.1
+bind-interfaces
+port=53
+
+# Upstream públicos (puedes cambiar a tu preferido)
+no-resolv
+server=1.1.1.1
+server=8.8.8.8
+domain-needed
+bogus-priv
+
+# Dominios internos (ejemplos genéricos)
+# Usa dominios propios de laboratorio/documentación (internal.example)
+# y reemplaza las IPs por IPs privadas reales de tu infraestructura.
+address=/app1.internal.example/192.0.2.10
+address=/app2.internal.example/192.0.2.20
+address=/monitor.internal.example/198.51.100.30
+address=/db.internal.example/203.0.113.40
+address=/router-site1.internal.example/10.0.10.1
+address=/router-site2.internal.example/10.0.20.1
+
+# Logging opcional
+log-queries

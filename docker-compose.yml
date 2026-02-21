@@ -1,0 +1,14 @@
+services:
+  dnsmasq:
+    image: jpillora/dnsmasq:latest
+    container_name: internal-dns
+    network_mode: host
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    command:
+      - -k
+      - --log-facility=-
+      - --conf-file=/etc/dnsmasq.d/dnsmasq.conf
+    volumes:
+      - ./config/dnsmasq.conf:/etc/dnsmasq.d/dnsmasq.conf:ro

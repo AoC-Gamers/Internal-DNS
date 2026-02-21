@@ -1,0 +1,11 @@
+# Configuración local no versionada
+config/dnsmasq.conf
+
+# Logs temporales
+*.log
+
+# Archivos de sistema/editor
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
