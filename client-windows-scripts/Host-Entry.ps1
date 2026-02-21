@@ -17,20 +17,12 @@ $PSEditionType = $PSVersionTable.PSEdition
 $IsPS7 = $PSMajor -eq 7
 $IsPS5 = $PSMajor -eq 5
 
-# Entradas DNS predefinidas
-$DefaultDnsEntries = @(
-    @{ Hostname = "traefik.svr.aoc-gamers.com"; IpAddress = "192.168.1.201" }
-    @{ Hostname = "phpmyadmin.svr.aoc-gamers.com"; IpAddress = "192.168.1.201" }
-    @{ Hostname = "traefik.intra.aoc-gamers.com"; IpAddress = "192.168.1.201" }
-    @{ Hostname = "phpmyadmin.intra.aoc-gamers.com"; IpAddress = "192.168.1.201" }
-    @{ Hostname = "valpo.intra.aoc-gamers.com"; IpAddress = "192.168.1.201" }
-    @{ Hostname = "valpo2.intra.aoc-gamers.com"; IpAddress = "192.168.1.202" }
-    @{ Hostname = "valpo2.intra"; IpAddress = "10.8.0.12" }
-    @{ Hostname = "router-valpo.intra.aoc-gamers.com"; IpAddress = "10.99.1.1" }
-    @{ Hostname = "router-valpo2.intra.aoc-gamers.com"; IpAddress = "10.99.2.1" }
-)
+# Entradas DNS cargadas desde JSON
+$DnsEntries = @()
 
 $hostsPath = Join-Path $env:SystemRoot "System32\drivers\etc\hosts"
+$ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+$DnsConfigPath = Join-Path $ScriptDir "domains.json"
 
 function Test-IsAdmin {
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -136,6 +128,83 @@ function Get-PSCapabilities {
         SupportsFormat = $true
     }
     return $capabilities
+}
+
+function Get-DnsEntriesFromConfig {
+    param(
+        [string]$ConfigPath
+    )
+
+    if (-not (Test-Path $ConfigPath)) {
+        Show-Error "No se encontro config DNS en: $ConfigPath"
+        Show-Warning "Copia domains.example.json a domains.json y personalizalo antes de ejecutar."
+        return @()
+    }
+
+    try {
+        $jsonRaw = Get-Content -Path $ConfigPath -Raw -ErrorAction Stop
+        $config = $jsonRaw | ConvertFrom-Json -ErrorAction Stop
+    } catch {
+        Show-Error "No se pudo leer/parsing el archivo DNS: $ConfigPath"
+        Write-Host "Detalle: $($_.Exception.Message)" -ForegroundColor DarkGray
+        return @()
+    }
+
+    $sourceEntries = @()
+    if ($config -is [System.Array]) {
+        $sourceEntries = @($config)
+    } elseif ($null -ne $config.entries) {
+        $sourceEntries = @($config.entries)
+    } else {
+        Show-Error "El archivo DNS no contiene 'entries': $ConfigPath"
+        return @()
+    }
+
+    $validatedEntries = @()
+
+    foreach ($entry in $sourceEntries) {
+        if ($null -eq $entry) {
+            continue
+        }
+
+        $isEnabled = $true
+        if ($entry.PSObject.Properties.Name -contains "enabled") {
+            $isEnabled = [bool]$entry.enabled
+        }
+        if (-not $isEnabled) {
+            continue
+        }
+
+        $hostname = ""
+        if ($entry.PSObject.Properties.Name -contains "hostname") {
+            $hostname = [string]$entry.hostname
+        } elseif ($entry.PSObject.Properties.Name -contains "Hostname") {
+            $hostname = [string]$entry.Hostname
+        }
+
+        $ipAddress = ""
+        if ($entry.PSObject.Properties.Name -contains "ipAddress") {
+            $ipAddress = [string]$entry.ipAddress
+        } elseif ($entry.PSObject.Properties.Name -contains "IpAddress") {
+            $ipAddress = [string]$entry.IpAddress
+        }
+
+        $hostname = $hostname.Trim()
+        $ipAddress = $ipAddress.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($hostname) -or [string]::IsNullOrWhiteSpace($ipAddress)) {
+            continue
+        }
+
+        $validatedEntries += @{ Hostname = $hostname; IpAddress = $ipAddress }
+    }
+
+    if ($validatedEntries.Count -eq 0) {
+        Show-Error "No hay entradas validas habilitadas en: $ConfigPath"
+        return @()
+    }
+
+    return @($validatedEntries)
 }
 
 function Show-Divider {
@@ -370,7 +439,7 @@ function Add-AllDnsEntries {
         $newLineHosts = New-Object System.Collections.Generic.List[string]
 
         foreach ($hostname in $lineHosts) {
-            $matchingEntry = $DefaultDnsEntries | Where-Object { $_.Hostname -eq $hostname }
+            $matchingEntry = $DnsEntries | Where-Object { $_.Hostname -eq $hostname }
             if ($matchingEntry) {
                 $processedHosts.Add($hostname) | Out-Null
             } else {
@@ -383,7 +452,7 @@ function Add-AllDnsEntries {
         }
     }
 
-    foreach ($entry in $DefaultDnsEntries) {
+    foreach ($entry in $DnsEntries) {
         if (-not $processedHosts.Contains($entry.Hostname)) {
             $updatedLines.Add("$($entry.IpAddress)`t$($entry.Hostname)")
         }
@@ -593,7 +662,7 @@ function Remove-AllDnsEntries {
     Write-Host ""
     Show-Divider
     
-    foreach ($entry in $DefaultDnsEntries) {
+    foreach ($entry in $DnsEntries) {
         Write-Host "  o " -NoNewline
         Write-Host "$($entry.Hostname)" -ForegroundColor Cyan -NoNewline
         Write-Host " ->" -NoNewline
@@ -648,7 +717,7 @@ function Remove-AllDnsEntries {
         $newLineHosts = New-Object System.Collections.Generic.List[string]
 
         foreach ($hostname in $lineHosts) {
-            $matchingEntry = $DefaultDnsEntries | Where-Object { $_.Hostname -eq $hostname }
+            $matchingEntry = $DnsEntries | Where-Object { $_.Hostname -eq $hostname }
             if ($matchingEntry) {
                 $removedCount++
             } else {
@@ -693,6 +762,13 @@ if (-not (Test-IsAdmin)) {
 if (-not (Test-Path $hostsPath)) {
     Write-Error "No se puede acceder a: $hostsPath"
     Write-Error "Asegurate de ejecutar como Administrador"
+    exit 1
+}
+
+$DnsEntries = @(Get-DnsEntriesFromConfig -ConfigPath $DnsConfigPath)
+
+if ($DnsEntries.Count -eq 0) {
+    Write-Error "No hay entradas DNS disponibles para operar."
     exit 1
 }
 

@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "vpnFix": {
+    "vpnDns": "10.8.0.1",
+    "testName": "site-b.vpn.internal",
+    "vpnDcoAliasPattern": "OpenVPN*Offload*",
+    "vpnTapAliasPattern": "OpenVPN*TAP*",
+    "preferredMetric": 5,
+    "nonVpnMetric": 50,
+    "logPath": "%TEMP%\\fix-vpn-dns.log"
+  },
+  "entries": [
+    {
+      "hostname": "proxy.site-a.internal.example",
+      "ipAddress": "10.20.1.10",
+      "enabled": true,
+      "tags": ["default"]
+    },
+    {
+      "hostname": "dbadmin.site-a.internal.example",
+      "ipAddress": "10.20.1.10",
+      "enabled": true,
+      "tags": ["default"]
+    },
+    {
+      "hostname": "proxy.vpn.internal.example",
+      "ipAddress": "10.20.1.10",
+      "enabled": true,
+      "tags": ["default"]
+    },
+    {
+      "hostname": "dbadmin.vpn.internal.example",
+      "ipAddress": "10.20.1.10",
+      "enabled": true,
+      "tags": ["default"]
+    },
+    {
+      "hostname": "site-a.vpn.internal.example",
+      "ipAddress": "10.20.1.10",
+      "enabled": true,
+      "tags": ["site-a"]
+    },
+    {
+      "hostname": "site-b.vpn.internal.example",
+      "ipAddress": "10.20.2.10",
+      "enabled": true,
+      "tags": ["site-b"]
+    },
+    {
+      "hostname": "site-b.vpn.internal",
+      "ipAddress": "10.8.0.20",
+      "enabled": true,
+      "tags": ["vpn"]
+    },
+    {
+      "hostname": "router-site-a.vpn.internal.example",
+      "ipAddress": "10.99.10.1",
+      "enabled": true,
+      "tags": ["router"]
+    },
+    {
+      "hostname": "router-site-b.vpn.internal.example",
+      "ipAddress": "10.99.20.1",
+      "enabled": true,
+      "tags": ["router"]
+    }
+  ]
+}

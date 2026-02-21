@@ -70,8 +70,65 @@ docker compose down
 
 Carpeta: `client-windows-scripts/`
 
-- `Fix-DNS-VPN.ps1`: diagnostica y corrige el comportamiento DNS en Windows cuando la VPN está conectada (métricas, TAP DNS, flush y verificación).
+- `Fix-DNS-VPN.ps1`: diagnostica y corrige el comportamiento DNS en Windows cuando la VPN está conectada (métricas, DNS en interfaz VPN activa DCO/TAP, flush y verificación).
 - `Host-Entry.ps1`: gestor interactivo para agregar, listar y eliminar entradas del archivo `hosts` con compatibilidad PS5/PS7.
+
+### Configurar dominios para Host-Entry.ps1
+
+El script carga dominios desde `client-windows-scripts/domains.json`.
+
+1. Crear archivo local a partir del ejemplo anonimizado:
+
+```powershell
+Copy-Item client-windows-scripts/domains.example.json client-windows-scripts/domains.json
+```
+
+2. Editar `client-windows-scripts/domains.json` con tus hostnames/IPs reales.
+
+Notas:
+
+- `domains.example.json` está versionado y usa datos de ejemplo.
+- `domains.json` es local y está ignorado por git.
+- `Host-Entry.ps1` requiere `domains.json`; si falta o es inválido, el script termina con error.
+
+### Configurar Fix-DNS-VPN.ps1 desde el mismo JSON
+
+`Fix-DNS-VPN.ps1` reutiliza `client-windows-scripts/domains.json` en la sección `vpnFix`.
+
+Ejemplo de bloque:
+
+```json
+"vpnFix": {
+	"vpnDns": "10.8.0.1",
+	"testName": "router-site-a.vpn.internal.example",
+	"vpnDcoAliasPattern": "OpenVPN*Offload*",
+	"vpnTapAliasPattern": "OpenVPN*TAP*",
+	"preferredMetric": 5,
+	"nonVpnMetric": 50,
+	"logPath": "%TEMP%\\fix-vpn-dns.log"
+}
+```
+
+Notas:
+
+- Los parámetros CLI siguen funcionando y tienen prioridad sobre `vpnFix`.
+- Si falta `vpnFix`, el script usa valores por defecto para `vpnDns`, patrones y métricas.
+- `testName` es obligatorio: debe venir en `vpnFix.testName` o por CLI con `-TestName`.
+- El panel ahora aplica DNS sobre adaptadores VPN activos detectados (DCO/TAP), no solo TAP por nombre fijo.
+
+### Uso rápido de Fix-DNS-VPN.ps1
+
+- Ejecutar panel interactivo:
+
+```powershell
+.\Fix-DNS-VPN.ps1
+```
+
+- Aplicar fix recomendado sin panel:
+
+```powershell
+.\Fix-DNS-VPN.ps1 -ApplyMetrics -ApplyVpnDns
+```
 
 ## Pruebas de resolución
 
