@@ -30,6 +30,61 @@ function Test-IsAdmin {
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+function Invoke-RequireAdmin {
+    if (-not (Test-IsAdmin)) {
+        Write-Host "[!] Elevando privilegios a Administrador..." -ForegroundColor Yellow
+        Write-Host ""
+        
+        try {
+            $scriptPath = $MyInvocation.ScriptName
+            if ([string]::IsNullOrEmpty($scriptPath)) {
+                $scriptPath = $PSCommandPath
+            }
+            if ([string]::IsNullOrEmpty($scriptPath)) {
+                Write-Error "No se pudo determinar la ruta del script para relanzar"
+                exit 1
+            }
+
+            $arguments = @(
+                "-NoProfile",
+                "-ExecutionPolicy", "Bypass",
+                "-File", "`"$scriptPath`""
+            )
+
+            # Agregar parametros originales si existen
+            if ($PSBoundParameters.Count -gt 0) {
+                foreach ($key in $PSBoundParameters.Keys) {
+                    $value = $PSBoundParameters[$key]
+                    if ($value -is [System.Management.Automation.SwitchParameter]) {
+                        if ($value.IsPresent) {
+                            $arguments += "-$key"
+                        }
+                    } else {
+                        $arguments += "-$key"
+                        $arguments += "`"$value`""
+                    }
+                }
+            }
+
+            Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -Verb RunAs
+            exit 0
+        } catch {
+            Write-Host "" 
+            Write-Host "[!] ERROR: No se pudo elevar a Administrador" -ForegroundColor Red
+            Write-Host ""
+            Write-Host "Solucion manual:" -ForegroundColor Yellow
+            Write-Host "  1. Abre PowerShell" -ForegroundColor White
+            Write-Host "  2. Haz clic derecho > Ejecutar como administrador" -ForegroundColor White
+            Write-Host "  3. Navega a la carpeta del script" -ForegroundColor White
+            Write-Host "  4. Ejecuta: .\Host-Entry.ps1" -ForegroundColor Cyan
+            Write-Host ""
+            Write-Host "Error: $($_.Exception.Message)" -ForegroundColor DarkGray
+            Write-Host ""
+            exit 1
+        }
+    }
+}
+
 function Write-HostsFileWithRetry {
     param(
         [object[]]$Lines,
@@ -744,19 +799,8 @@ function Remove-AllDnsEntries {
 }
 
 # MAIN
-if (-not (Test-IsAdmin)) {
-    Clear-Host
-    Write-Host ""
-    Write-Host "[!] ERROR: Este script debe ejecutarse como Administrador" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "Solucion:" -ForegroundColor Yellow
-    Write-Host "  1. Abre PowerShell" -ForegroundColor White
-    Write-Host "  2. Haz clic derecho > Ejecutar como administrador" -ForegroundColor White
-    Write-Host "  3. Navega a la carpeta del script" -ForegroundColor White
-    Write-Host "  4. Ejecuta: .\host-entry.ps1" -ForegroundColor Cyan
-    Write-Host ""
-    exit 1
-}
+# Auto-elevar a administrador si es necesario
+Invoke-RequireAdmin
 
 # Validar acceso al archivo hosts
 if (-not (Test-Path $hostsPath)) {
